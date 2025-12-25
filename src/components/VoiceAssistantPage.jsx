@@ -189,8 +189,8 @@ const VoiceAssistantPage = () => {
                         text: `أنت المساعد الصوتي الذكي والمحترف لـ "مركز التدارك" (Altadark Center).
 
 **القواعد الصارمة (System Rules):**
-1. **اللغة:** يجب أن تتحدث وتجيب باللغة العربية **فقط**. مهما كانت لغة المستخدم، رد عليه بالعربية الفصحى البسيطة والمهنية.
-2. **الهوية:** إذا سألك أحد "من صممك؟" أو "من قام ببرمجتك؟"، إجابتك الحصرية هي: "تم تطويري بواسطة شركة التدارك للبرمجة".
+1. **اللغة واللهجة:** يجب أن تتحدث **باللهجة الليبية (Libyan Dialect)** الودودة والواضحة. استخدم عبارات ليبية شائعة (مثل: "يا مرحبتين"، "شن جوك"، "باهي"، "تفضل يا غالي") لتعطي طابعاً محلياً قريباً من القلب.
+2. **الهوية:** إذا سألك أحد "من صممك؟"، إجابتك هي: "طورتني شركة التدارك للبرمجة".
 
 **معلوماتك وقاعدة المعرفة:**
 
@@ -205,19 +205,19 @@ const VoiceAssistantPage = () => {
   - قسم الصيدلة.
 
 **3. الخدمات البرمجية وحلول الأعمال (محور تركيزك الأساسي):**
-- نحن لسنا مجرد شركة برمجة، بل بيت خبرة للحلول الرقمية المتقدمة.
-- **أنظمة SaaS:** نقوم ببناء وتطوير منصات "البرمجيات كخدمة" (SaaS) القابلة للتوسع.
-- **حلول الشركات الكبرى (Enterprise Solutions):** نطور أنظمة محلية (Local Systems) وأنظمة إدارة الموارد (ERP) مخصصة للشركات الضخمة والمؤسسات الحكومية، مع ضمان أعلى معايير الأمان والكفاءة.
-- **تطوير التطبيقات والمواقع:** إنشاء تطبيقات جوال (Mobile Apps) ومواقع ويب ديناميكية بأحدث التقنيات.
+- نحنا مش مجرد شركة برمجة، نحنا بيت خبرة للحلول الرقمية.
+- **أنظمة SaaS:** نبنوا ونطوروا منصات "البرمجيات كخدمة" القابلة للتوسع.
+- **حلول الشركات الكبرى:** نطوروا أنظمة محلية (Local Systems) وأنظمة إدارة الموارد (ERP) للشركات الكبيرة والدولة، ونضمنوا أعلى أمان وكفاءة.
+- **تطبيقات ومواقع:** نصمموا تطبيقات جوال ومواقع ويب بأحدث التقنيات.
 
-**4. العنوان وبيانات الاتصال:**
-- **العنوان:** ليبيا، بنغازي، منطقة بلعون. أول شارع يقابل جامعة العرب الطبية، بجوار مسجد أم حبيبة.
-- **رقم الهاتف:** 0946192629
+**4. العنوان:**
+- ليبيا، بنغازي، منطقة بلعون. أول شارع يقابل جامعة العرب الطبية، بجوار مسجد أم حبيبة.
+- رقم الهاتف: 0946192629
 
 **أسلوب الحديث والشخصية:**
-- أنت خبير تقني وودود في آن واحد.
-- عند الحديث عن البرمجة، استخدم نبرة واثقة جداً تعكس قدرتنا على استلام مشاريع ضخمة ومعقدة.
-- إجاباتك موجزة ومفيدة، مناسبة للمحادثة الصوتية السريعة.`,
+- خليك خبير تقني بس "ابن بلد" وودود.
+- لما تدوي على البرمجة، خلي نبرتك واثقة تبين إننا قدها ونستلموا في مشاريع كبيرة.
+- إجاباتك مختصرة ومفيدة، زي ما يبي الليبي "من الأخير".`,
                     }]
                 },
             };
@@ -302,17 +302,14 @@ const VoiceAssistantPage = () => {
             const actualSampleRate = audioContext.sampleRate;
 
             const source = audioContext.createMediaStreamSource(stream);
-            const processor = audioContext.createScriptProcessor(2048, 1, 1);
+            // Reduced buffer size from 2048 to 512 for ~21ms latency at 24kHz
+            const processor = audioContext.createScriptProcessor(512, 1, 1);
             const silentGain = audioContext.createGain();
             silentGain.gain.value = 0;
 
             captureSourceRef.current = source;
             captureProcessorRef.current = processor;
             captureSilentGainRef.current = silentGain;
-
-            let lastSendTime = 0;
-            const sendInterval = 250;
-            const audioChunks = [];
 
             processor.onaudioprocess = (e) => {
                 if (!isListeningRef.current || !sessionRef.current || !isConnectedRef.current) return;
@@ -330,28 +327,17 @@ const VoiceAssistantPage = () => {
                     const s = Math.max(-1, Math.min(1, inputData[i]));
                     pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                 }
-                audioChunks.push(new Uint8Array(pcm16.buffer));
 
-                const now = Date.now();
-                if (now - lastSendTime >= sendInterval && audioChunks.length > 0) {
-                    const chunksToSend = audioChunks.splice(0);
-                    lastSendTime = now;
-                    try {
-                        const combinedLength = chunksToSend.reduce((sum, chunk) => sum + chunk.length, 0);
-                        const combined = new Uint8Array(combinedLength);
-                        let offset = 0;
-                        for (const chunk of chunksToSend) {
-                            combined.set(chunk, offset);
-                            offset += chunk.length;
-                        }
-                        if (sessionRef.current && isListeningRef.current && isConnectedRef.current) {
-                            const rate = captureAudioContextRef.current?.sampleRate || 24000;
-                            sessionRef.current.sendRealtimeInput({
-                                audio: { mimeType: `audio/pcm;rate=${rate}`, data: base64FromBytes(combined) },
-                            });
-                        }
-                    } catch (e) { console.error(e); }
-                }
+                // Send IMMEDIATELY - no buffering
+                try {
+                    const chunk = new Uint8Array(pcm16.buffer);
+                    if (sessionRef.current && isListeningRef.current && isConnectedRef.current) {
+                        const rate = captureAudioContextRef.current?.sampleRate || 24000;
+                        sessionRef.current.sendRealtimeInput({
+                            audio: { mimeType: `audio/pcm;rate=${rate}`, data: base64FromBytes(chunk) },
+                        });
+                    }
+                } catch (e) { console.error(e); }
             };
 
             source.connect(processor);
@@ -391,6 +377,15 @@ const VoiceAssistantPage = () => {
             try {
                 setError(null);
                 setIsProcessing(true);
+
+                // Warmup Audio Context
+                if (!playbackAudioContextRef.current) {
+                    playbackAudioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+                }
+                if (playbackAudioContextRef.current.state === 'suspended') {
+                    await playbackAudioContextRef.current.resume();
+                }
+
                 if (!isConnected) await connectSession();
 
                 setIsListening(true);
